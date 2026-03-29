@@ -1,0 +1,419 @@
+https://github.com/Hariet-infanta/Expense-Tracker
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard | Expense Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+    font-family: 'Segoe UI';
+    background: linear-gradient(135deg, #eef2f7, #dfe9f3);
+    margin:0;
+}
+
+
+header {
+    background: linear-gradient(135deg, #43cea2, #185a9d);
+    color:#fff;
+    padding:18px 30px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    box-shadow:0 4px 10px rgba(0,0,0,0.15);
+}
+
+header button {
+    padding:7px 16px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+
+.container {
+    padding:25px;
+    max-width:1100px;
+    margin:auto;
+}
+
+
+.budget-box {
+    display:flex;
+    gap:10px;
+}
+
+.budget-box input {
+    flex:1;
+    padding:12px;
+    border-radius:10px;
+    border:1px solid #ccc;
+}
+
+.budget-box button {
+    padding:12px 18px;
+    background:#4CAF50;
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+}
+
+
+.progress-container {
+    height:12px;
+    background:#ddd;
+    border-radius:10px;
+    margin-top:8px;
+    overflow:hidden;
+}
+
+#budgetBar {
+    height:100%;
+    width:0%;
+    background:#4CAF50;
+    transition:0.4s;
+}
+
+
+.summary {
+    display:flex;
+    gap:15px;
+    margin:20px 0;
+}
+
+.summary div {
+    flex:1;
+    background:#fff;
+    padding:20px;
+    border-radius:14px;
+    text-align:center;
+    box-shadow:0 6px 18px rgba(0,0,0,0.08);
+}
+
+
+select {
+    padding:10px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    margin-bottom:10px;
+}
+
+
+table {
+    width:100%;
+    border-collapse:collapse;
+    margin-top:20px;
+    background:#fff;
+    border-radius:14px;
+    overflow:hidden;
+    box-shadow:0 6px 18px rgba(0,0,0,0.08);
+}
+
+th {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color:#fff;
+}
+
+th, td {
+    padding:14px;
+}
+
+td {
+    border-bottom:1px solid #f1f1f1;
+}
+
+tr:nth-child(even) {
+    background:#f9fbfd;
+}
+
+tr:hover {
+    background:#eef7ff;
+}
+
+td button {
+    background:#ff4d4d;
+    color:#fff;
+    border:none;
+    padding:6px 10px;
+    border-radius:6px;
+    cursor:pointer;
+}
+
+
+.chart-box {
+    margin-top:25px;
+    background:#fff;
+    padding:20px;
+    border-radius:14px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.08);
+    max-width:400px;
+    height:300px;
+    margin-left:auto;
+    margin-right:auto;
+}
+
+
+#budgetWarn {
+    text-align:center;
+    font-weight:bold;
+    margin-top:10px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h2>💸 Expense Tracker</h2>
+<div>
+<button onclick="window.location.href='addExpense.html'">Add Transaction</button>
+<button onclick="logout()">Logout</button>
+</div>
+</header>
+
+<div class="container">
+
+
+<div class="budget-box">
+<input id="budgetInput" type="number" placeholder="Set Monthly Budget">
+<button onclick="setBudget()">Save</button>
+</div>
+
+<p id="budgetWarn"></p>
+
+<div class="progress-container">
+<div id="budgetBar"></div>
+</div>
+
+
+<div class="summary">
+<div><h3>Income 💸</h3><p id="totalIncome">0</p></div>
+<div><h3>Expense 📈</h3><p id="totalExpense">0</p></div>
+<div><h3>Net Savings 🌱</h3><p id="netSavings">0</p></div>
+</div>
+
+
+<select id="monthFilter" onchange="loadTransactions()">
+<option value="">All Months</option>
+<option value="2026-01">Jan</option>
+<option value="2026-02">Feb</option>
+<option value="2026-03">Mar</option>
+<option value="2026-04">Apr</option>
+<option value="2026-05">May</option>
+<option value="2026-06">Jun</option>
+</select>
+
+
+<table>
+<thead>
+<tr>
+<th>Description</th>
+<th>Category</th>
+<th>Type</th>
+<th>Amount</th>
+<th>Date</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="list"></tbody>
+</table>
+
+
+<div class="chart-box">
+<canvas id="chart"></canvas>
+</div>
+
+</div>
+
+<script>
+const userId = localStorage.getItem("userId");
+if(!userId) window.location.href="login.html";
+
+let transactions = [];
+let chart;
+let currentBudget = 0;
+
+
+const now = new Date();
+document.getElementById("monthFilter").value =
+`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+
+function getCategoryIcon(cat){
+    const icons = {
+        Food:"🍔",
+        Transport:"🚗",
+        Shopping:"🛍️",
+        Bills:"💡",
+        Health:"💊",
+        Entertainment:"🎬",
+        Education:"📚",
+        Travel:"✈️",
+        Income:"💰",
+        Other:"📦"
+    };
+    return icons[cat] || "📦";
+}
+
+
+async function loadTransactions(){
+    let res = await fetch(`http://localhost:5000/transactions/${userId}`);
+    let data = await res.json();
+
+    const filter = document.getElementById("monthFilter").value;
+
+    // ✅ FIXED FILTER (NO DATE OBJECT)
+    if(filter){
+        data = data.filter(t => t.date && t.date.startsWith(filter));
+    }
+
+    transactions = data;
+    updateUI();
+}
+
+
+async function setBudget(){
+    const amount = +document.getElementById("budgetInput").value;
+
+    if(!amount || amount <= 0){
+        alert("Enter valid budget 😭");
+        return;
+    }
+
+    const month = document.getElementById("monthFilter").value ||
+    `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+    currentBudget = amount;
+
+    await fetch("http://localhost:5000/budget",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({userId, amount, month})
+    });
+
+    updateUI();
+}
+
+
+function formatDate(d){
+    if(!d) return "-";
+    const [yyyy, mm, dd] = d.split("-");
+    return `${dd}-${mm}-${yyyy}`;
+}
+
+
+async function updateUI(){
+    const list = document.getElementById("list");
+    list.innerHTML="";
+
+    let income=0, expense=0;
+
+    transactions.forEach(t=>{
+        const tr = document.createElement("tr");
+
+        const category = t.category || "Other";
+        const type = t.type || "expense";
+
+        tr.innerHTML = `
+        <td>${t.description || "-"}</td>
+        <td>${getCategoryIcon(category)} ${category}</td>
+        <td>${type}</td>
+        <td>₹${t.amount}</td>
+        <td>${formatDate(t.date)}</td>
+        <td><button onclick="deleteTransaction(${t.id})">❌</button></td>
+        `;
+
+        list.appendChild(tr);
+
+        if(type === "income") income += t.amount;
+        else expense += t.amount;
+    });
+
+    document.getElementById("totalIncome").innerText = income;
+    document.getElementById("totalExpense").innerText = expense;
+    document.getElementById("netSavings").innerText = income - expense;
+
+    const month = document.getElementById("monthFilter").value ||
+    `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+    let budgetAmount = currentBudget;
+
+    if(!budgetAmount){
+        const res = await fetch(`http://localhost:5000/budget/${userId}?month=${month}`);
+        const budget = await res.json();
+        budgetAmount = budget.amount || 0;
+        currentBudget = budgetAmount;
+    }
+
+    const warn = document.getElementById("budgetWarn");
+    const bar = document.getElementById("budgetBar");
+
+    if(budgetAmount){
+        const remaining = budgetAmount - expense;
+
+        if(remaining < 0){
+            warn.innerText = `⚠️😭 Budget Exceeded !! Limit: ₹${budgetAmount} | Overspent: ₹${Math.abs(remaining)}`;
+            warn.style.color = "red";
+        } else {
+            warn.innerText = `Budget: ₹${budgetAmount} | Remaining: ₹${remaining}`;
+            warn.style.color = "green";
+        }
+
+        let percent = (expense / budgetAmount) * 100;
+
+        bar.style.width = Math.min(percent,100) + "%";
+        bar.style.background = percent > 100 ? "red" : "#4CAF50";
+
+    } else {
+        warn.innerText = "No budget set";
+        bar.style.width = "0%";
+    }
+
+    drawChart(income, expense);
+}
+
+
+function drawChart(income, expense){
+    const ctx = document.getElementById("chart").getContext("2d");
+
+    if(chart) chart.destroy();
+
+    chart = new Chart(ctx,{
+        type:"doughnut",
+        data:{
+            labels:["Income 💰","Expense 💸"],
+            datasets:[{
+                data:[income, expense],
+                backgroundColor:["#4CAF50","#FF6384"]
+            }]
+        },
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins:{
+                legend:{ position:"bottom" }
+            }
+        }
+    });
+}
+
+
+async function deleteTransaction(id){
+    await fetch(`http://localhost:5000/transactions/${id}`,{method:"DELETE"});
+    loadTransactions();
+}
+
+
+function logout(){
+    localStorage.removeItem("userId");
+    window.location.href="login.html";
+}
+
+
+loadTransactions();
+</script>
+
+</body>
+</html>
