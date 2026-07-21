@@ -259,7 +259,7 @@ function getCategoryIcon(cat){
 
 
 async function loadTransactions(){
-    let res = await fetch(`http://localhost:5000/transactions/${userId}`);
+    let res = await fetch(`/transactions/${userId}`);
     let data = await res.json();
 
     const filter = document.getElementById("monthFilter").value;
@@ -286,8 +286,7 @@ async function setBudget(){
     `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
 
     currentBudget = amount;
-
-    await fetch("http://localhost:5000/budget",{
+   await fetch("/budget",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({userId, amount, month})
@@ -341,7 +340,7 @@ async function updateUI(){
     let budgetAmount = currentBudget;
 
     if(!budgetAmount){
-        const res = await fetch(`http://localhost:5000/budget/${userId}?month=${month}`);
+        const res = await fetch(`/budget/${userId}?month=${month}`);
         const budget = await res.json();
         budgetAmount = budget.amount || 0;
         currentBudget = budgetAmount;
@@ -401,7 +400,7 @@ function drawChart(income, expense){
 
 
 async function deleteTransaction(id){
-    await fetch(`http://localhost:5000/transactions/${id}`,{method:"DELETE"});
+    await fetch(`/transactions/${id}`, { method: "DELETE" });
     loadTransactions();
 }
 
