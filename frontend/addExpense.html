@@ -178,7 +178,7 @@ async function addExpense(){
     const type = (category === "Income") ? "income" : "expense";
 
     try{
-        const res = await fetch("http://localhost:5000/transactions",{
+        const res = await fetch("/transactions",{
             method:"POST",
             headers:{"Content-Type":"application/json"},
             body: JSON.stringify({
